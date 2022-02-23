@@ -2,7 +2,6 @@ package ammunition
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/dblencowe/CheekyBreekiBot/helper"
 	"github.com/go-echarts/go-echarts/v2/charts"
@@ -13,25 +12,11 @@ import (
 type AmmoGraph struct {
 }
 
-func generatePenetrationItems(ammo []TarkovAmmunition) []opts.ScatterData {
+func generateItems(ammo []TarkovAmmunition) []opts.ScatterData {
 	items := make([]opts.ScatterData, 0)
 	for i := 0; i < len(ammo); i++ {
 		items = append(items, opts.ScatterData{
-			Value:        ammo[i].Ballistics.PenetrationPower,
-			Symbol:       "roundRect",
-			SymbolSize:   20,
-			SymbolRotate: 10,
-		})
-	}
-
-	return items
-}
-
-func generateDamageItems(ammo []TarkovAmmunition) []opts.ScatterData {
-	items := make([]opts.ScatterData, 0)
-	for i := 0; i < len(ammo); i++ {
-		items = append(items, opts.ScatterData{
-			Value:        ammo[i].Ballistics.Damage,
+			Value:        []int{ammo[i].Ballistics.PenetrationPower, ammo[i].Ballistics.Damage},
 			Symbol:       "roundRect",
 			SymbolSize:   20,
 			SymbolRotate: 10,
@@ -50,8 +35,7 @@ func makeChart(ammo []TarkovAmmunition) *charts.Scatter {
 		}),
 	)
 	chart.
-		AddSeries("Penetration", generatePenetrationItems(ammo)).
-		AddSeries("Damage", generateDamageItems(ammo))
+		AddSeries("Ammo", generateItems(ammo))
 
 	return chart
 }
@@ -62,7 +46,7 @@ func NewAmmoGraph(ammo []TarkovAmmunition) *bytes.Buffer {
 	chart.Render(chartBuffer)
 	helper.CreateFile("/tmp/example.html", chartBuffer.Bytes())
 	imageBuffer := &bytes.Buffer{}
-	bytes := GenerateImage(chartBuffer.String())
+	bytes := helper.GenerateImageFromHtml(chartBuffer.String())
 	imageBuffer.Write(bytes)
 	return imageBuffer
 }
