@@ -10,9 +10,12 @@ import (
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/dblencowe/CheekyBreekiBot/ammunition"
+	"github.com/dblencowe/CheekyBreekiBot/helper"
 	"github.com/dblencowe/CheekyBreekiBot/items"
 	"github.com/dblencowe/CheekyBreekiBot/maps"
 	"github.com/dblencowe/CheekyBreekiBot/quests"
+	"github.com/dblencowe/CheekyBreekiBot/traders"
 )
 
 var (
@@ -42,6 +45,7 @@ func main() {
 	maps.LoadMaps()
 	items.LoadItems()
 	quests.LoadQuests()
+	ammunition.LoadAmmunition()
 
 	fmt.Println("Bot is now running. Press CTRL+C to exit.")
 	sc := make(chan os.Signal, 1)
@@ -56,6 +60,10 @@ func messageCreate(session *discordgo.Session, message *discordgo.MessageCreate)
 		return
 	}
 
+	if message.Content[0:1] != "!" {
+		return
+	}
+
 	content := strings.ToLower(message.Content)
 	parts := strings.Split(content, " ")
 	command, arguements := parts[0], parts[1:]
@@ -67,6 +75,8 @@ func messageCreate(session *discordgo.Session, message *discordgo.MessageCreate)
 		mapSummary(session, message.ChannelID, strings.Join(arguements, " "))
 	case "!quest":
 		questInfo(session, message.ChannelID, strings.Join(arguements, " "))
+	case "!caliber":
+		caliberSummary(session, message.ChannelID, strings.Join(arguements, " "))
 	default:
 		fmt.Println("Unknown command", command, arguements)
 	}
@@ -83,7 +93,49 @@ func questInfo(session *discordgo.Session, channelId string, searchQuery string)
 		session.ChannelMessageSend(channelId, fmt.Sprintf("Sorry, a search for \"%s\" did not return any quests", searchQuery))
 		return
 	}
-	session.ChannelMessageSend(channelId, fmt.Sprintf("Is Kappa: %t", !tarkovQuest.Nokappa))
+
+	kappaValue := "Yes"
+	if tarkovQuest.Nokappa {
+		kappaValue = "No"
+	}
+
+	var unlocksList []string
+	for i := range tarkovQuest.Unlocks {
+		id := tarkovQuest.Unlocks[i]
+		item := items.GetItemById(id)
+		if item == nil {
+			continue
+
+		}
+		unlocksList = append(unlocksList, item.Name)
+	}
+
+	embed := helper.NewEmbed().SetTitle(tarkovQuest.Title).SetURL(tarkovQuest.Wiki).AddField("Given By", traders.GetTraderById(tarkovQuest.Giver).Name).AddField("Required for Kappa?", kappaValue).AddField("Exp. Granted", fmt.Sprintf("%d exp.", tarkovQuest.Exp))
+	if len(unlocksList) > 0 {
+		embed = embed.AddField("Unlocks", strings.Join(unlocksList, "- \n"))
+	}
+	// session.ChannelMessageSend(channelId, tarkovQuest.Title)
+	session.ChannelMessageSendEmbed(channelId, embed.MessageEmbed)
+}
+
+func caliberSummary(session *discordgo.Session, channelId string, term string) {
+	caliber := ammunition.GetCaliber(term)
+	if len(caliber) == 0 {
+		session.ChannelMessageSend(channelId, fmt.Sprintf("Sorry, a search for \"%s\" returned no results.", term))
+		session.ChannelMessageSend(channelId, fmt.Sprintf("Available Calibers: %s", strings.Join(ammunition.LoadedCalibers, ", ")))
+		return
+	}
+
+	ammos := ammunition.GetAmmosByCaliber(caliber)
+	var ammoList []string
+	for i := range ammos {
+		ammoList = append(ammoList, ammos[i].ShortName)
+	}
+
+	graph := ammunition.NewAmmoGraph(ammos)
+
+	session.ChannelMessageSend(channelId, fmt.Sprintf("%s: %s", caliber, strings.Join(ammoList, ", ")))
+	session.ChannelFileSend(channelId, caliber, graph)
 }
 
 func sendScaredRedGif(session *discordgo.Session, channelId string) {

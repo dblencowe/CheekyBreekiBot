@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+
+	"github.com/dblencowe/CheekyBreekiBot/helper"
 )
 
 var LoadedQuests []TarkovQuest
@@ -22,10 +24,10 @@ type TarkovQuest struct {
 	Locales struct {
 		En string `json:"en"`
 	} `json:"locales"`
-	Nokappa    bool          `json:"nokappa"`
-	Wiki       string        `json:"wiki"`
-	Exp        int           `json:"exp"`
-	Unlocks    []interface{} `json:"unlocks"`
+	Nokappa    bool     `json:"nokappa"`
+	Wiki       string   `json:"wiki"`
+	Exp        int      `json:"exp"`
+	Unlocks    []string `json:"unlocks"`
 	Reputation []struct {
 		Trader int     `json:"trader"`
 		Rep    float64 `json:"rep"`
@@ -58,12 +60,19 @@ func LoadQuests() {
 	fmt.Printf("Loaded %d quests\n", len(LoadedQuests))
 }
 
+type questComparison struct {
+	Distance int
+	Quest    TarkovQuest
+}
+
 func GetQuest(questName string) *TarkovQuest {
+	var closestQuest questComparison
+	closestQuest.Distance = 0
 	for i := range LoadedQuests {
-		if strings.ToLower(LoadedQuests[i].Title) == questName {
-			return &LoadedQuests[i]
+		distance := helper.Levenshtein(strings.ToLower(LoadedQuests[i].Title), questName)
+		if distance <= closestQuest.Distance {
+			closestQuest = questComparison{Distance: distance, Quest: LoadedQuests[i]}
 		}
 	}
-
-	return nil
+	return &closestQuest.Quest
 }
